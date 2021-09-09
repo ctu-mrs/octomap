@@ -292,6 +292,8 @@ namespace octomap {
     */
     bool computeRayKeys(const point3d& origin, const point3d& end, KeyRay& ray) const;
 
+    bool computeRayKeys(const point3d& origin, const point3d& end, KeyRay& ray, const double resolution) const;
+
 
    /**
     * Traces a ray from origin to end (excluding), returning the
