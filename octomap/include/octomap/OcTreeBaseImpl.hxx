@@ -254,6 +254,44 @@ namespace octomap {
 
 
   template <class NODE,class I>
+  void OcTreeBaseImpl<NODE,I>::eatChildren(NODE* node) {
+
+    if (!nodeHasChildren(node)) {
+      return;      
+    }
+
+    node->value = eatChildrenRecurs(node);
+  }
+
+  template <class NODE,class I>
+  double OcTreeBaseImpl<NODE,I>::eatChildrenRecurs(NODE* node) {
+
+    if (!nodeHasChildren(node)) {
+      return node->getValue();
+    }
+
+    double max_value = -1.0;
+
+    for (unsigned int i=0; i < 8; i++) {
+
+      if(nodeChildExists(node, i)) {
+
+        NODE* child = getNodeChild(node, i);
+
+        double node_value = eatChildrenRecurs(child);
+
+        if (node_value > max_value) {
+          max_value = node_value; 
+        }
+
+        deleteNodeChild(node, i);
+      }
+    }
+
+    return max_value;
+  }
+
+  template <class NODE,class I>
   void OcTreeBaseImpl<NODE,I>::expandNode(NODE* node){
     assert(!nodeHasChildren(node));
 
@@ -276,6 +314,7 @@ namespace octomap {
     for (unsigned int i=0;i<8;i++) {
       deleteNodeChild(node, i);
     }
+
     delete[] node->children;
     node->children = NULL;
 
