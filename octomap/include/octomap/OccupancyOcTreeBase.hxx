@@ -279,6 +279,21 @@ namespace octomap {
   }
 
   template <class NODE>
+  NODE* OccupancyOcTreeBase<NODE>::setNodeValueDepth(const OcTreeKey& key, float log_odds_value, int depth, bool lazy_eval) {
+    // clamp log odds within range:
+    log_odds_value = std::min(std::max(log_odds_value, this->clamping_thres_min), this->clamping_thres_max);
+
+    bool createdRoot = false;
+    if (this->root == NULL){
+      this->root = new NODE();
+      this->tree_size++;
+      createdRoot = true;
+    }
+
+    return setNodeValueRecurs(this->root, createdRoot, key, depth, log_odds_value, lazy_eval);
+  }
+
+  template <class NODE>
   NODE* OccupancyOcTreeBase<NODE>::setNodeValue(const point3d& value, float log_odds_value, bool lazy_eval) {
     OcTreeKey key;
     if (!this->coordToKeyChecked(value, key))
@@ -318,6 +333,29 @@ namespace octomap {
     }
 
     return updateNodeRecurs(this->root, createdRoot, key, 0, log_odds_update, lazy_eval);
+  }
+
+  template <class NODE>
+  NODE* OccupancyOcTreeBase<NODE>::updateNodeDepth(const OcTreeKey& key, float log_odds_update, int max_depth, bool lazy_eval) {
+    // early abort (no change will happen).
+    // may cause an overhead in some configuration, but more often helps
+    NODE* leaf = this->search(key);
+    // no change: node already at threshold
+    if (leaf
+        && ((log_odds_update >= 0 && leaf->getLogOdds() >= this->clamping_thres_max)
+        || ( log_odds_update <= 0 && leaf->getLogOdds() <= this->clamping_thres_min)))
+    {
+      return leaf;
+    }
+
+    bool createdRoot = false;
+    if (this->root == NULL){
+      this->root = new NODE();
+      this->tree_size++;
+      createdRoot = true;
+    }
+
+    return updateNodeRecurs(this->root, createdRoot, key, 0, max_depth, log_odds_update, lazy_eval);
   }
 
   template <class NODE>
@@ -391,6 +429,69 @@ namespace octomap {
         return updateNodeRecurs(this->getNodeChild(node, pos), created_node, key, depth+1, log_odds_update, lazy_eval);
       else {
         NODE* retval = updateNodeRecurs(this->getNodeChild(node, pos), created_node, key, depth+1, log_odds_update, lazy_eval);
+        // prune node if possible, otherwise set own probability
+        // note: combining both did not lead to a speedup!
+        if (this->pruneNode(node)){
+          // return pointer to current parent (pruned), the just updated node no longer exists
+          retval = node;
+        } else{
+          node->updateOccupancyChildren();
+        }
+
+        return retval;
+      }
+    }
+
+    // at last level, update node, end of recursion
+    else {
+      if (use_change_detection) {
+        bool occBefore = this->isNodeOccupied(node);
+        updateNodeLogOdds(node, log_odds_update);
+
+        if (node_just_created){  // new node
+          changed_keys.insert(std::pair<OcTreeKey,bool>(key, true));
+        } else if (occBefore != this->isNodeOccupied(node)) {  // occupancy changed, track it
+          KeyBoolMap::iterator it = changed_keys.find(key);
+          if (it == changed_keys.end())
+            changed_keys.insert(std::pair<OcTreeKey,bool>(key, false));
+          else if (it->second == false)
+            changed_keys.erase(it);
+        }
+      } else {
+        updateNodeLogOdds(node, log_odds_update);
+      }
+      return node;
+    }
+  }
+
+  template <class NODE>
+  NODE* OccupancyOcTreeBase<NODE>::updateNodeRecurs(NODE* node, bool node_just_created, const OcTreeKey& key,
+                                                    unsigned int depth, unsigned int max_depth, const float& log_odds_update, bool lazy_eval) {
+    bool created_node = false;
+
+    assert(node);
+
+    // follow down to last level
+    if (depth < max_depth) {
+      unsigned int pos = computeChildIdx(key, this->tree_depth -1 - depth);
+      if (!this->nodeChildExists(node, pos)) {
+        // child does not exist, but maybe it's a pruned node?
+        if (!this->nodeHasChildren(node) && !node_just_created ) {
+          // current node does not have children AND it is not a new node
+          // -> expand pruned node
+          this->expandNode(node);
+        }
+        else {
+          // not a pruned node, create requested child
+          this->createNodeChild(node, pos);
+          created_node = true;
+        }
+      }
+
+      if (lazy_eval)
+        return updateNodeRecurs(this->getNodeChild(node, pos), created_node, key, depth+1, max_depth, log_odds_update, lazy_eval);
+      else {
+        NODE* retval = updateNodeRecurs(this->getNodeChild(node, pos), created_node, key, depth+1, max_depth, log_odds_update, lazy_eval);
         // prune node if possible, otherwise set own probability
         // note: combining both did not lead to a speedup!
         if (this->pruneNode(node)){

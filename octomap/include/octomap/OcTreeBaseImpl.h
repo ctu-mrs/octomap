@@ -220,6 +220,10 @@ namespace octomap {
      */
     bool deleteNode(const OcTreeKey& key, unsigned int depth = 0);
 
+    void eatChildren(NODE* node);
+
+    double eatChildrenRecurs(NODE* node);
+
     /// Deletes the complete tree structure
     void clear();
 

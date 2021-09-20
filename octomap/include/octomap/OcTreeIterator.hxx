@@ -114,6 +114,11 @@
       NodeType& operator*() { return *(stack.top().node);}
 
       /// return the center coordinate of the current node
+      NodeType* getNode() {
+        return stack.top().node;
+      }
+
+      /// return the center coordinate of the current node
       point3d getCoordinate() const {
         return tree->keyToCoord(stack.top().key, stack.top().depth);
       }

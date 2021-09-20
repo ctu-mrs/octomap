@@ -157,6 +157,8 @@ namespace octomap {
       */
      virtual NODE* setNodeValue(const OcTreeKey& key, float log_odds_value, bool lazy_eval = false);
 
+     virtual NODE* setNodeValueDepth(const OcTreeKey& key, float log_odds_value, int depth, bool lazy_eval = false);
+
      /**
       * Set log_odds value of voxel to log_odds_value.
       * Looks up the OcTreeKey corresponding to the coordinate and then calls setNodeValue() with it.
@@ -194,6 +196,8 @@ namespace octomap {
       * @return pointer to the updated NODE
       */
      virtual NODE* updateNode(const OcTreeKey& key, float log_odds_update, bool lazy_eval = false);
+
+     virtual NODE* updateNodeDepth(const OcTreeKey& key, float log_odds_update, int max_depth, bool lazy_eval = false);
 
      /**
       * Manipulate log_odds value of a voxel by changing it by log_odds_update (relative).
@@ -478,6 +482,9 @@ namespace octomap {
 
     NODE* updateNodeRecurs(NODE* node, bool node_just_created, const OcTreeKey& key,
                            unsigned int depth, const float& log_odds_update, bool lazy_eval = false);
+
+    NODE* updateNodeRecurs(NODE* node, bool node_just_created, const OcTreeKey& key,
+                           unsigned int depth, unsigned int max_depth, const float& log_odds_update, bool lazy_eval = false);
     
     NODE* setNodeValueRecurs(NODE* node, bool node_just_created, const OcTreeKey& key,
                            unsigned int depth, const float& log_odds_value, bool lazy_eval = false);
